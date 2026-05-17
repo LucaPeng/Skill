@@ -1,0 +1,16 @@
+=== SCENARIO 7: baseline isolation (RS-2 key criterion) ===
+Created strategy-my-rotation-rule with source: user_custom, priority: primary
+Already had strategy-chan-theory with source: baseline, priority: reference
+
+Query "可用于判断板块轮动的策略":
+Result: Returns plain_test, stocks/300750, report first — strategy-chan-theory ranked 4th [0.8593]
+strategy-my-rotation-rule NOT in top 5 at all
+
+No way to add WHERE source = 'user_custom' clause
+No way to add WHERE priority = 'primary' clause
+
+OBSERVATIONS:
+- Q7.A: NO - cannot group/filter by source field
+- Q7.B: Priority ranking is prompt-level, NOT retrieval-level
+
+VERDICT: FAIL - RS-2 cannot be implemented with GBrain as-is; no source/baseline isolation at query level

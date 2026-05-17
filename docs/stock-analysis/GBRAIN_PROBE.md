@@ -398,52 +398,83 @@ test_run_id: <TEST_RUN_ID>
 
 | 工具名 | 类型 | 输入 schema 摘要 | 备注 |
 |---|---|---|---|
-| _待填_ | _read/write_ | _..._ | _..._ |
+| get_page | read | slug, fuzzy?, include_deleted? | |
+| put_page | write | slug, content | |
+| delete_page | write | slug | |
+| list_pages | read | type?, tag?, limit?, sort? | **type 过滤有 bug** |
+| search | read | query, limit?, offset? | tsvector 关键词搜索 |
+| query | read | query, limit?, offset?, expand?, salience?, recency?, since?, until? | 混合向量搜索 |
+| add_tag / remove_tag / get_tags | write/read | slug, tag | |
+| add_link / get_backlinks | write/read | from, to, type? | |
+| graph | read | slug, depth? | |
+| extract_facts / recall / forget_fact | write/read | fact_id?, content? | |
+| takes_list / takes_search | read | query?, limit? | |
+| submit_job / get_job / list_jobs / cancel_job | write/read | job name, params | |
+| sources_add / sources_list / sources_remove | write/read | id, path? | |
+| get_recent_salience / find_anomalies / find_experts | read | days?, kind? | |
+| find_contradictions | read | topic | |
+| think | read | question | |
+| put_raw_data / get_raw_data | write/read | slug, data | |
+| file_upload / file_list / file_url | write/read | file, page_slug? | |
+| get_brain_identity / get_stats / get_health / run_doctor | read | - | |
+| sync_brain | write | - | |
+| get_ingest_log / log_ingest / get_chunks | read | slug? | |
+
+**共 63 个工具。** 读写区分：通过 operation description 判断（写操作标注 `mutating: true`）。
 
 ### 6.2 验证点矩阵
 
 | ID | 验证点 | 结果 | 关键证据 / 现象 | 影响 |
 |---|---|---|---|---|
-| V1 | 工具清单 | ⬜ PASS / FAIL / UNKNOWN | _执行后填_ | _执行后填_ |
-| V2 | 实体类型显式声明 | ⬜ | | |
-| V3 | typed link 写法 | ⬜ | | |
-| V4 | ingest 幂等性 | ⬜ | | |
-| V5 | 基础 query 结构 | ⬜ | | |
-| V6 | **字段级精确过滤** | ⬜ | | **决定 P1-2 Schema 是否成立** |
-| V7 | baseline 隔离 | ⬜ | | **决定 RS-2 落地方式** |
-| V8 | 异常返回形式 | ⬜ | | 决定 §3.3.1 降级实现 |
+| V1 | 工具清单 | ✅ PASS | 63 个工具，≥5 阈值，读写可区分 | — |
+| V2 | 实体类型显式声明 | ❌ FAIL | plain text ingest 后 type=concept；frontmatter type 存但不语义化 | **Schema type 字段无实际作用** |
+| V3 | typed link 写法 | ❌ FAIL | markdown `[A](X) rel [B](Y)` 不被识别为边；auto_links:0；graph 返回 links:[] | **Schema 关系语法无法落地** |
+| V4 | ingest 幂等性 | ✅ PASS | 相同内容 re-ingest → status:skipped；内容变更 → upsert；不复制 | 回归脚本无需先 delete |
+| V5 | 基础 query 结构 | ✅ PASS | 返回 score(float)；默认 limit=20；支持 --offset 分页 | — |
+| V6 | **字段级精确过滤** | ❌ FAIL | list --type Report → "No pages found"；query 自然语言过滤 → 语义相似度，非精确 | **决定 P1-2 Schema 是否成立** |
+| V7 | baseline 隔离 | ❌ FAIL | source: user_custom 的 strategy 未被优先召回；无 WHERE source= 过滤 | **决定 RS-2 落地方式** |
+| V8 | 异常返回形式 | ✅ PASS | query 无匹配 → 返回最近似结果（空数组反而是错误）；非法 type 值静默接受 | 降级策略有效 |
 
 ### 6.3 关键问题答案表
 
 | Question | 答案 | 影响下一步 |
 |---|---|---|
-| Q2.A 实体类型由 LLM 还是规则提取？ | _待填_ | _Schema 写法严格度_ |
-| Q2.B 不写 frontmatter 能区分类型吗？ | _待填_ | _frontmatter 是否必填_ |
-| Q3.A `type: Stock` 是否被实体化？ | _待填_ | **Schema 必含字段** |
-| Q3.B markdown link 形式的 typed link 被识别吗？ | _待填_ | **Schema 关系语法** |
-| Q3.C 是否支持 `links:` 数组显式声明？ | _待填_ | _首选语法_ |
-| Q3.D typed link 名是否需要预注册？ | _待填_ | _初始化脚本是否必须_ |
-| Q4.A id 重 ingest 是 upsert 还是 append？ | _待填_ | **回归脚本要不要先 delete** |
-| Q4.B 删除 API 是什么？ | _待填_ | _清理脚本怎么写_ |
-| Q5.A 返回有 score 吗？ | _待填_ | _Skill 是否要做阈值过滤_ |
-| Q5.B 默认返回数量？分页？ | _待填_ | _query 时要不要传 limit_ |
-| Q5.C 能限定 type 吗？ | _待填_ | _精度方案_ |
-| **Q6.A 至少一种试法能精确过滤吗？** | _待填_ | **决定 P1-2 是否成立** |
-| Q6.B 如不行，备用方案？ | _待填_ | _要不要建本地 index_ |
-| Q6.C 嵌套字段能检索吗？ | _待填_ | **决定 modules 是否拍平** |
-| Q7.A 能按 source 分组吗？ | _待填_ | _RS-2 落地形式_ |
-| Q7.B priority 排序是 prompt 还是召回层？ | _待填_ | _LLM 提示词复杂度_ |
-| Q8.A 失败错误码 / 异常类型？ | _待填_ | _try/except 模板_ |
-| Q8.B 有 retry 吗？ | _待填_ | _重试队列实现方式_ |
+| Q2.A 实体类型由 LLM 还是规则提取？ | 自动推断为 "concept" | frontmatter type 必须标注 |
+| Q2.B 不写 frontmatter 能区分类型吗？ | 不能 | frontmatter 是必填字段 |
+| Q3.A `type: Stock` 是否被实体化？ | 否；type 存但不做语义推理 | **Schema type 无实际作用** |
+| Q3.B markdown link 形式的 typed link 被识别吗？ | 否；auto_links:0 | **Schema 关系语法无法落地** |
+| Q3.C 是否支持 `links:` 数组显式声明？ | 不支持（无此语法） | 首选语法待探索 |
+| Q3.D typed link 名是否需要预注册？ | 不需要（因为根本不被识别） | — |
+| Q4.A id 重 ingest 是 upsert 还是 append？ | **upsert** | 回归脚本无需先 delete |
+| Q4.B 删除 API 是什么？ | `gbrain delete <slug>`（CLI）/ `delete_page`（MCP） | 清理脚本用 `gbrain delete` |
+| Q5.A 返回有 score 吗？ | 有（query: 0-1 浮点；search: 任意浮点） | Skill 可做阈值过滤 |
+| Q5.B 默认返回数量？分页？ | 默认 20；支持 --offset 分页 | query 时建议传 limit |
+| Q5.C 能限定 type 吗？ | `list --type` 有 bug 返回 0 结果 | **精度方案受限** |
+| **Q6.A 至少一种试法能精确过滤吗？** | **否** | **决定 P1-2 必须改双轨** |
+| Q6.B 如不行，备用方案？ | 客户端过滤（fetch all + filter） | 要建本地 index |
+| Q6.C 嵌套字段能检索吗？ | 不能（无结构化过滤能力） | **modules 需拍平到顶层** |
+| Q7.A 能按 source 分组吗？ | 不能 | RS-2 无法在召回层实现 |
+| Q7.B priority 排序是 prompt 还是召回层？ | prompt 层面（无法在召回层约束） | LLM 提示词复杂度高 |
+| Q8.A 失败错误码 / 异常类型？ | 无结构化错误码；静默接受无效值 | try/except 按 error message 匹配 |
+| Q8.B 有 retry 吗？ | 无 | 重试队列需自实现 |
 
-### 6.4 总结性结论（执行完后写）
+### 6.4 总结性结论
 
-> _待填_：用 PROPOSAL §5 的"四件套"格式给最终判断：
->
-> - 🎯 结论：GBrain 是否足够支撑 P1-2 结构化 Schema 设计？（高/中/低 置信度）
-> - 📊 核心指标：成功试法数 / 失败试法数 / unknown 数
+> 用 PROPOSAL §5 的"四件套"格式给最终判断：
+
+> - 🎯 结论：**GBrain 无法支撑 P1-2 结构化 Schema 设计**（低置信度）
+> - 📊 核心指标：成功试法数 **2/8**（V1+V4+V5+V8=4 pass） / 失败试法数 **4**（V2+V3+V6+V7） / unknown 数 0
 > - 🧠 判断逻辑：
+>   - GBrain 是**纯向量检索引擎**，frontmatter 仅作 metadata 存储，不参与过滤/推理
+>   - `type: Stock` 被当作普通文本存储，不触发任何实体类型语义
+>   - typed link 完全不被识别（auto_links:0），关系图谱依赖落空
+>   - `list --type` 存在 bug，无法按 type 筛选（即使 type 字段存在）
+>   - 所有过滤/隔离能力（source、priority、confidence）只能在 prompt 层做，无法在检索层约束
 > - ⚠️ 反向信号 / 风险：
+>   - **typed link 不 work** → Schema 设计的关系语法（图谱边）无法落地
+>   - **字段过滤不 work** → 判断层四件套的 confidence/verdict 字段无法结构化检索
+>   - **source 隔离不 work** → RS-2 的 baseline vs user_custom 隔离无法实现
+>   - → 结论：**必须走分支 B（双轨）** 或重新评估 GBrain 选型
 
 ---
 
@@ -452,11 +483,21 @@ test_run_id: <TEST_RUN_ID>
 ### 7.1 清理脚本（执行完毕后必跑）
 
 ```bash
-# 通过 GBrain MCP 删除所有 _probe/${TEST_RUN_ID}/ 下的 page
-# 具体命令取决于 GBrain 的 delete API（在 SCENARIO 4 / 8 中已摸清）
-gbrain delete --prefix "_probe/${TEST_RUN_ID}/"
-# 或者用 brain-ops 暴露的批量删除原语
+# 删除所有 _probe/gbrain-probe-20260517-0437/ 下的 page
+cd ~/brain
+BRAIN_DIR=/data00/home/songpeng.nk/brain ~/npm-global/lib/node_modules/bun/bin/bun.exe /home/songpeng.nk/gbrain/src/cli.ts delete "_probe/gbrain-probe-20260517-0437/plain_test"
+~/npm-global/lib/node_modules/bun/bin/bun.exe /home/songpeng.nk/gbrain/src/cli.ts delete "_probe/gbrain-probe-20260517-0437/stocks/300750"
+~/npm-global/lib/node_modules/bun/bin/bun.exe /home/songpeng.nk/gbrain/src/cli.ts delete "_probe/gbrain-probe-20260517-0437/sectors/new_energy"
+~/npm-global/lib/node_modules/bun/bin/bun.exe /home/songpeng.nk/gbrain/src/cli.ts delete "_probe/gbrain-probe-20260517-0437/strategy-chan-theory"
+~/npm-global/lib/node_modules/bun/bin/bun.exe /home/songpeng.nk/gbrain/src/cli.ts delete "_probe/gbrain-probe-20260517-0437/strategy-my-rotation-rule"
+~/npm-global/lib/node_modules/bun/bin/bun.exe /home/songpeng.nk/gbrain/src/cli.ts delete "_probe/gbrain-probe-20260517-0437/report-300750-2026-05-17"
+~/npm-global/lib/node_modules/bun/bin/bun.exe /home/songpeng.nk/gbrain/src/cli.ts delete "_probe/gbrain-probe-20260517-0437/report-300750-2026-05-18"
+~/npm-global/lib/node_modules/bun/bin/bun.exe /home/songpeng.nk/gbrain/src/cli.ts delete "_probe/gbrain-probe-20260517-0437/report-600519-2026-05-17"
+~/npm-global/lib/node_modules/bun/bin/bun.exe /home/songpeng.nk/gbrain/src/cli.ts delete "_probe/gbrain-probe-20260517-0437/test-invalid-type"
+~/npm-global/lib/node_modules/bun/bin/bun.exe /home/songpeng.nk/gbrain/src/cli.ts delete "_probe/gbrain-probe-20260517-0437/test-wrong-type"
 ```
+
+> 已验证：GBrain delete_page 是软删除，72h 后被 autopurge 清理。
 
 ### 7.2 Step 2 验收标准（[PLAN.md](./PLAN.md) §第 2 步要求）
 

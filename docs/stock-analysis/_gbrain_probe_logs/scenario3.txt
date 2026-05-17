@@ -1,0 +1,25 @@
+=== SCENARIO 3: frontmatter + typed links ===
+Created pages:
+- _probe/gbrain-probe-20260517-0437/stocks/300750 (type: Stock)
+- _probe/gbrain-probe-20260517-0437/sectors/new_energy (type: Sector)
+- _probe/gbrain-probe-20260517-0437/strategy-chan-theory (type: Strategy, source: baseline)
+
+Body text contains markdown links with typed relations:
+[宁德时代](stocks/300750.md) belongs_to_sector [新能源](sectors/new_energy.md)
+[宁德时代](stocks/300750.md) belongs_to_industry [动力电池](industries/dongli_battery.md)
+[宁德时代](stocks/300750.md) competes_with [比亚迪](stocks/002594.md)
+
+Results:
+- graph _probe/.../stocks/300750 --depth 2: returns {"links": []} — NO typed links extracted
+- get_links: command not found
+- Query "宁德时代 belongs_to_sector": returns the page but as text match, NOT graph traversal
+- Query "新能源板块的股票": returns sector page + plain_test + stock page (semantic, NOT graph)
+
+OBSERVATIONS:
+- Q3.A: type: Stock IS stored in frontmatter but not exposed as entity type semantic
+- Q3.B: markdown [A](X) rel [B](Y) syntax NOT recognized as typed link
+- Q3.C: links: array in frontmatter NOT mentioned/documented
+- Q3.D: typed link names like belongs_to_sector NOT pre-registered (no registration mechanism found)
+- auto_links: 0 created despite valid markdown links
+
+VERDICT: FAIL - typed links NOT recognized; frontmatter type stored but not semantic; no explicit link declaration format

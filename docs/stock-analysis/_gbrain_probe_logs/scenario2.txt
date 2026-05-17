@@ -1,0 +1,16 @@
+=== SCENARIO 2: plain text ingest ===
+Command: put "_probe/gbrain-probe-20260517-0437/plain_test" with Chinese text containing 宁德时代(300750), 新能源, 动力电池, 比亚迪(002594)
+
+Query "宁德时代": Returns the page as top result [0.9137]
+Query "新能源 板块": Returns the page as top result [0.8829]
+
+Graph traversal: links:[] (no edges created)
+Page type after ingest: type: concept (auto-assigned, NOT derived from entity names)
+
+OBSERVATIONS:
+- Q2.A: Entity type is auto-assigned as "concept" — NO explicit entity typing
+- Q2.B: Without frontmatter, no way to say "300750 is Stock not concept"
+- No typed edges created automatically
+- auto_links: 0 created
+
+VERDICT: FAIL - entity types NOT inferred; no typed links created; auto type is "concept"

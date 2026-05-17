@@ -1,0 +1,19 @@
+=== SCENARIO 5: Basic query structure ===
+Query "动力电池": returns results with score [0.8876, 0.8719, 0.5406]
+Query "宁德时代": returns results with score [0.8823, 0.8074, 0.4986]
+
+Result structure (from call query):
+{
+  "slug": "...", "page_id": N, "title": "...", "type": "concept",
+  "chunk_text": "...", "chunk_source": "compiled_truth",
+  "chunk_id": N, "chunk_index": N, "score": 0.8879, "stale": false, "source_id": "default"
+}
+
+search command (tsvector keyword): returns [4.3333, 1.1667, 1.0055] — rank values different from query
+
+OBSERVATIONS:
+- Q5.A: YES, returns score (float, 0-1 range for query, arbitrary for search)
+- Q5.B: Default limit 20, pagination via --offset
+- Q5.C: list --type Report -> "No pages found" despite pages with type: Report existing
+
+VERDICT: PASS (structure) - scores returned, paginated, type filter in list_pages BROKEN

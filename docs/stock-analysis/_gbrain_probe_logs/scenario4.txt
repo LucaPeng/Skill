@@ -1,0 +1,12 @@
+=== SCENARIO 4: Idempotency test ===
+Test 1: Re-ingest identical page -> status: "skipped", chunks: 0 (no-op, idempotent)
+Test 2: Re-ingest with modified body -> status: "created_or_updated", chunks: 1 (upsert)
+
+Query "300750": Returns 1 result (the upserted page), not 2
+
+OBSERVATIONS:
+- Q4.A: Same id re-ingest is UPSERT (not append)
+- Q4.B: No delete API tested yet — need to find delete mechanism
+- "skipped" status for identical content = content-addressable deduplication
+
+VERDICT: PASS - ingest is idempotent/upsert; no duplication

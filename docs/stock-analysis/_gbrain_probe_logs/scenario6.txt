@@ -1,0 +1,21 @@
+=== SCENARIO 6: Field-level exact filter (P1-2 key criterion) ===
+Created 3 report pages with different confidence levels:
+- report-300750-2026-05-17: confidence=medium
+- report-300750-2026-05-18: confidence=low  
+- report-600519-2026-05-17: confidence=high
+
+Method A: Natural language "confidence 为 low 的 report"
+Result: Returns all 3 reports, NOT filtered (semantic similarity, not structured filter)
+
+Method B: list --type Report
+Result: "No pages found" — type filter completely broken for custom types
+
+Method C: call query with various params (limit, offset, since, until)
+Result: No field-level filter params exist; --since/--until filter by effective_date, not frontmatter fields
+
+OBSERVATIONS:
+- Q6.A: NO - none of the methods can precisely filter by frontmatter field values
+- Q6.B: Alternative is client-side filtering (fetch all, filter in Python) — inefficient
+- Q6.C: Nested fields (modules.sector_environment.confidence) would need to be top-level to be filterable
+
+VERDICT: FAIL - field-level exact filter NOT supported; type: Report in list_pages finds 0 pages

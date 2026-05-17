@@ -1,0 +1,544 @@
+[
+  {
+    "name": "get_page",
+    "description": "Read a page by slug (supports optional fuzzy matching). Soft-deleted pages are hidden by default; pass include_deleted: true to surface them with deleted_at populated (see v0.26.5 recovery window).",
+    "parameters": {
+      "slug": "string",
+      "fuzzy": "boolean?",
+      "include_deleted": "boolean?"
+    }
+  },
+  {
+    "name": "put_page",
+    "description": "Write/update a page (markdown with frontmatter). Chunks, embeds, reconciles tags, and (when auto_link/auto_timeline are enabled) extracts + reconciles graph links and timeline entries.",
+    "parameters": {
+      "slug": "string",
+      "content": "string"
+    }
+  },
+  {
+    "name": "delete_page",
+    "description": "Soft-delete a page. The row is hidden from search and from get_page/list_pages, but is recoverable via restore_page within 72h. The autopilot purge phase hard-deletes after the recovery window. Pass include_deleted: true to get_page to verify the soft-delete landed.",
+    "parameters": {
+      "slug": "string"
+    }
+  },
+  {
+    "name": "list_pages",
+    "description": "List pages with optional filters. For 'what's recent / what did I touch this week' questions, use list_pages with sort=updated_desc instead of semantic search.",
+    "parameters": {
+      "type": "string?",
+      "tag": "string?",
+      "limit": "number?",
+      "updated_after": "string?",
+      "sort": "string?",
+      "include_deleted": "boolean?"
+    }
+  },
+  {
+    "name": "restore_page",
+    "description": "v0.26.5 — restore a soft-deleted page (clear deleted_at). Returns success only if the page was actually soft-deleted. After this op, the page reappears in search and in get_page/list_pages without the include_deleted flag.",
+    "parameters": {
+      "slug": "string"
+    }
+  },
+  {
+    "name": "purge_deleted_pages",
+    "description": "v0.26.5 — admin-only. Hard-deletes pages whose deleted_at is older than older_than_hours (default 72). Cascades through content_chunks, page_links, chunk_relations. Local CLI only (not exposed over HTTP MCP). Manual escape hatch alongside the autopilot purge phase.",
+    "parameters": {
+      "older_than_hours": "number?"
+    }
+  },
+  {
+    "name": "search",
+    "description": "Keyword search using full-text search. For personal/emotional questions, prefer get_recent_salience or find_anomalies — they surface activity bursts without needing a search term.",
+    "parameters": {
+      "query": "string",
+      "limit": "number?",
+      "offset": "number?"
+    }
+  },
+  {
+    "name": "query",
+    "description": "Hybrid search with vector + keyword + multi-query expansion. For personal/emotional questions ('what's going on with me', 'anything notable', 'how am I feeling'), prefer get_recent_salience, find_anomalies, or get_recent_transcripts. Semantic search returns polished pages and misses recent activity bursts. Do NOT assume words like 'crazy', 'notable', or 'big' mean impressive — they often mean difficult or emotionally charged.",
+    "parameters": {
+      "query": "string?",
+      "image": "string?",
+      "image_mime": "string?",
+      "limit": "number?",
+      "offset": "number?",
+      "expand": "boolean?",
+      "detail": "string?",
+      "lang": "string?",
+      "symbol_kind": "string?",
+      "near_symbol": "string?",
+      "walk_depth": "number?",
+      "salience": "string?",
+      "recency": "string?",
+      "since": "string?",
+      "until": "string?"
+    }
+  },
+  {
+    "name": "add_tag",
+    "description": "Add tag to page",
+    "parameters": {
+      "slug": "string",
+      "tag": "string"
+    }
+  },
+  {
+    "name": "remove_tag",
+    "description": "Remove tag from page",
+    "parameters": {
+      "slug": "string",
+      "tag": "string"
+    }
+  },
+  {
+    "name": "get_tags",
+    "description": "List tags for a page",
+    "parameters": {
+      "slug": "string"
+    }
+  },
+  {
+    "name": "add_link",
+    "description": "Create link between pages",
+    "parameters": {
+      "from": "string",
+      "to": "string",
+      "link_type": "string?",
+      "context": "string?"
+    }
+  },
+  {
+    "name": "remove_link",
+    "description": "Remove link between pages",
+    "parameters": {
+      "from": "string",
+      "to": "string"
+    }
+  },
+  {
+    "name": "get_links",
+    "description": "List outgoing links from a page",
+    "parameters": {
+      "slug": "string"
+    }
+  },
+  {
+    "name": "get_backlinks",
+    "description": "List incoming links to a page",
+    "parameters": {
+      "slug": "string"
+    }
+  },
+  {
+    "name": "traverse_graph",
+    "description": "Traverse link graph from a page. With link_type/direction, returns edges (GraphPath[]) instead of nodes.",
+    "parameters": {
+      "slug": "string",
+      "depth": "number?",
+      "link_type": "string?",
+      "direction": "string?"
+    }
+  },
+  {
+    "name": "add_timeline_entry",
+    "description": "Add timeline entry to a page",
+    "parameters": {
+      "slug": "string",
+      "date": "string",
+      "summary": "string",
+      "detail": "string?",
+      "source": "string?"
+    }
+  },
+  {
+    "name": "get_timeline",
+    "description": "Get timeline entries for a page",
+    "parameters": {
+      "slug": "string"
+    }
+  },
+  {
+    "name": "get_stats",
+    "description": "Brain statistics (page count, chunk count, etc.)",
+    "parameters": {}
+  },
+  {
+    "name": "get_health",
+    "description": "Brain health dashboard (embed coverage, stale pages, orphans)",
+    "parameters": {}
+  },
+  {
+    "name": "run_doctor",
+    "description": "Run brain health checks and return a structured DoctorReport (thin-client doctor surface).",
+    "parameters": {}
+  },
+  {
+    "name": "get_versions",
+    "description": "Page version history",
+    "parameters": {
+      "slug": "string"
+    }
+  },
+  {
+    "name": "revert_version",
+    "description": "Revert page to a previous version",
+    "parameters": {
+      "slug": "string",
+      "version_id": "number"
+    }
+  },
+  {
+    "name": "get_brain_identity",
+    "description": "Brain identity + counters for thin-client banner. Returns version, engine kind, and page/chunk counts. Read-scope.",
+    "parameters": {}
+  },
+  {
+    "name": "sync_brain",
+    "description": "Sync git repo to brain (incremental)",
+    "parameters": {
+      "repo": "string?",
+      "dry_run": "boolean?",
+      "full": "boolean?",
+      "no_pull": "boolean?",
+      "no_embed": "boolean?"
+    }
+  },
+  {
+    "name": "put_raw_data",
+    "description": "Store raw API response data for a page",
+    "parameters": {
+      "slug": "string",
+      "source": "string",
+      "data": "object"
+    }
+  },
+  {
+    "name": "get_raw_data",
+    "description": "Retrieve raw data for a page",
+    "parameters": {
+      "slug": "string",
+      "source": "string?"
+    }
+  },
+  {
+    "name": "resolve_slugs",
+    "description": "Fuzzy-resolve a partial slug to matching page slugs",
+    "parameters": {
+      "partial": "string"
+    }
+  },
+  {
+    "name": "get_chunks",
+    "description": "Get content chunks for a page",
+    "parameters": {
+      "slug": "string"
+    }
+  },
+  {
+    "name": "log_ingest",
+    "description": "Log an ingestion event",
+    "parameters": {
+      "source_type": "string",
+      "source_ref": "string",
+      "pages_updated": "array",
+      "summary": "string"
+    }
+  },
+  {
+    "name": "get_ingest_log",
+    "description": "Get recent ingestion log entries",
+    "parameters": {
+      "limit": "number?"
+    }
+  },
+  {
+    "name": "file_list",
+    "description": "List stored files",
+    "parameters": {
+      "slug": "string?"
+    }
+  },
+  {
+    "name": "file_upload",
+    "description": "Upload a file to storage",
+    "parameters": {
+      "path": "string",
+      "page_slug": "string?"
+    }
+  },
+  {
+    "name": "file_url",
+    "description": "Get a URL for a stored file",
+    "parameters": {
+      "storage_path": "string"
+    }
+  },
+  {
+    "name": "submit_job",
+    "description": "Submit a background job to the Minions queue. Built-in types: sync, embed, lint, import, extract, backlinks, autopilot-cycle. The `shell` type is CLI-only and rejected over MCP.",
+    "parameters": {
+      "name": "string",
+      "data": "object?",
+      "queue": "string?",
+      "priority": "number?",
+      "max_attempts": "number?",
+      "delay": "number?",
+      "timeout_ms": "number?"
+    }
+  },
+  {
+    "name": "get_job",
+    "description": "Get job status and details by ID",
+    "parameters": {
+      "id": "number"
+    }
+  },
+  {
+    "name": "list_jobs",
+    "description": "List jobs with optional filters",
+    "parameters": {
+      "status": "string?",
+      "queue": "string?",
+      "name": "string?",
+      "limit": "number?"
+    }
+  },
+  {
+    "name": "cancel_job",
+    "description": "Cancel a waiting, active, or delayed job",
+    "parameters": {
+      "id": "number"
+    }
+  },
+  {
+    "name": "retry_job",
+    "description": "Re-queue a failed or dead job for retry",
+    "parameters": {
+      "id": "number"
+    }
+  },
+  {
+    "name": "get_job_progress",
+    "description": "Get structured progress for a running job",
+    "parameters": {
+      "id": "number"
+    }
+  },
+  {
+    "name": "pause_job",
+    "description": "Pause a waiting, active, or delayed job",
+    "parameters": {
+      "id": "number"
+    }
+  },
+  {
+    "name": "resume_job",
+    "description": "Resume a paused job back to waiting",
+    "parameters": {
+      "id": "number"
+    }
+  },
+  {
+    "name": "replay_job",
+    "description": "Replay a completed/failed/dead job, optionally with modified data",
+    "parameters": {
+      "id": "number",
+      "data_overrides": "object?"
+    }
+  },
+  {
+    "name": "send_job_message",
+    "description": "Send a sidechannel message to a running job's inbox",
+    "parameters": {
+      "id": "number",
+      "payload": "object",
+      "sender": "string?"
+    }
+  },
+  {
+    "name": "find_orphans",
+    "description": "Find pages with no inbound wikilinks. Essential for content enrichment cycles.",
+    "parameters": {
+      "include_pseudo": "boolean?"
+    }
+  },
+  {
+    "name": "takes_list",
+    "description": "List takes (typed/weighted/attributed claims) filtered by holder/kind/active/etc.",
+    "parameters": {
+      "page_slug": "string?",
+      "holder": "string?",
+      "kind": "string?",
+      "active": "boolean?",
+      "resolved": "boolean?",
+      "sort_by": "string?",
+      "limit": "number?",
+      "offset": "number?"
+    }
+  },
+  {
+    "name": "takes_search",
+    "description": "Keyword search across takes (pg_trgm similarity over claim text)",
+    "parameters": {
+      "query": "string",
+      "limit": "number?"
+    }
+  },
+  {
+    "name": "think",
+    "description": "Multi-hop synthesis across pages + takes + graph. Pulls relevant evidence and produces a cited answer with conflict + gap analysis.",
+    "parameters": {
+      "question": "string",
+      "anchor": "string?",
+      "rounds": "number?",
+      "save": "boolean?",
+      "take": "boolean?",
+      "model": "string?",
+      "since": "string?",
+      "until": "string?"
+    }
+  },
+  {
+    "name": "takes_scorecard",
+    "description": "Calibration scorecard for resolved bets: counts, accuracy, Brier (correct ∨ incorrect only), partial_rate.",
+    "parameters": {
+      "holder": "string?",
+      "domain_prefix": "string?",
+      "since": "string?",
+      "until": "string?"
+    }
+  },
+  {
+    "name": "takes_calibration",
+    "description": "Calibration curve: resolved correct/incorrect bets binned by stated weight; observed vs predicted per bucket.",
+    "parameters": {
+      "holder": "string?",
+      "bucket_size": "number?"
+    }
+  },
+  {
+    "name": "whoami",
+    "description": "Introspect the calling identity. Returns one of three transport shapes: {transport: \"oauth\", client_id, client_name, scopes, expires_at}, {transport: \"legacy\", token_name, scopes, expires_at: null}, or {transport: \"local\", scopes: []}. Throws unknown_transport when the context is ambiguous (remote=true without auth) — fail-closed posture mirroring the v0.26.9 trust-boundary contract.",
+    "parameters": {}
+  },
+  {
+    "name": "sources_add",
+    "description": "Register a new source. Supports either --path (existing v0.17 behavior) or --url (v0.28 federated remote-clone path: parses the URL through the SSRF gate, clones into $GBRAIN_HOME/clones/<id>/ via temp-dir + rename atomicity, and stores remote_url in sources.config). Pre-flight collision check on id; rollback on either-side failure.",
+    "parameters": {
+      "id": "string",
+      "name": "string?",
+      "path": "string?",
+      "url": "string?",
+      "federated": "boolean?",
+      "clone_dir": "string?"
+    }
+  },
+  {
+    "name": "sources_list",
+    "description": "List registered sources with page counts and remote_url. v0.28 surfaces the new remote_url field so a remote MCP caller can confirm a source is managed by clone+pull rather than user-supplied path.",
+    "parameters": {
+      "include_archived": "boolean?"
+    }
+  },
+  {
+    "name": "sources_remove",
+    "description": "Hard-remove a source (cascades pages/chunks/embeddings). Refuses to delete the auto-managed clone dir unless its resolved path is confined under $GBRAIN_HOME/clones/ (realpath+lstat — symlink-safe). For most workflows prefer sources_archive for the soft-delete path.",
+    "parameters": {
+      "id": "string",
+      "confirm_destructive": "boolean?",
+      "dry_run": "boolean?",
+      "keep_storage": "boolean?"
+    }
+  },
+  {
+    "name": "sources_status",
+    "description": "Per-source diagnostic. Returns clone_state (\"healthy\" | \"missing\" | \"not-a-dir\" | \"no-git\" | \"url-drift\" | \"corrupted\" | \"not-applicable\") so a remote MCP caller can diagnose whether the on-disk clone is syncable without SSH access to the brain host.",
+    "parameters": {
+      "id": "string"
+    }
+  },
+  {
+    "name": "get_recent_salience",
+    "description": "Returns pages recently touched and ranked by emotional + activity salience (deterministic 0..1 emotional_weight + take density + recency decay). Use this when the user asks what's been going on, what's notable, what's hot, anything crazy happening, or for any open-ended 'current state' question about themselves or their work. Do NOT run a semantic search for these — salience surfaces what's unusual without needing a search term.",
+    "parameters": {
+      "days": "number?",
+      "limit": "number?",
+      "slugPrefix": "string?",
+      "recency_bias": "string?"
+    }
+  },
+  {
+    "name": "find_anomalies",
+    "description": "Returns statistical anomalies in recent page activity, grouped by cohort (tag or type). Use this for questions about what stood out, what's unusual, or what changed recently. Returns explanatory cohorts (e.g. '15 pages tagged wedding touched on 2026-04-28, baseline 0.3/day') so you can speak about patterns the user wouldn't have searched for. Cohort kinds: tag, type. Year cohort is deferred to a later release.",
+    "parameters": {
+      "since": "string?",
+      "lookback_days": "number?",
+      "sigma": "number?"
+    }
+  },
+  {
+    "name": "get_recent_transcripts",
+    "description": "Returns one-line summaries of recent raw conversation transcripts (NOT polished reflections). Use this FIRST for questions about 'what's going on with me', 'what have I been thinking about', or anything personal/emotional. Raw transcripts are the canonical source for the user's own state — polished pages summarize and flatten. Local-only: rejects remote (MCP/HTTP) callers with a clear permission_denied; call via the gbrain CLI.",
+    "parameters": {
+      "days": "number?",
+      "summary": "boolean?",
+      "limit": "number?"
+    }
+  },
+  {
+    "name": "extract_facts",
+    "description": "v0.31: extract personal-knowledge facts (events, preferences, commitments, beliefs) from a conversation turn into the per-source hot memory. Sanitizes turn_text via INJECTION_PATTERNS, calls Haiku to extract structured claims, runs the cosine fast-path + classifier dedup pipeline, INSERTs into facts. Returns counts by status. Skips extraction when the turn is dream-generated content (anti-loop).",
+    "parameters": {
+      "turn_text": "string",
+      "session_id": "string?",
+      "entity_hints": "array?",
+      "is_dream_generated": "boolean?",
+      "visibility": "string?"
+    }
+  },
+  {
+    "name": "recall",
+    "description": "v0.31: query per-source hot memory (facts table). Filters by entity / since / session. Remote callers see only visibility=world facts. Returns most-recent first. v0.32 adds optional include_pending to return pending_consolidation_count alongside facts in one round trip.",
+    "parameters": {
+      "entity": "string?",
+      "since": "string?",
+      "session_id": "string?",
+      "include_expired": "boolean?",
+      "supersessions": "boolean?",
+      "limit": "number?",
+      "grep": "string?",
+      "include_pending": "boolean?"
+    }
+  },
+  {
+    "name": "forget_fact",
+    "description": "v0.32.2: forget a fact. Rewrites the page's `## Facts` fence to strike through the row and set valid_until=today (the DB's expired_at derives via valid_until + now() on the next reconcile so the forget survives `gbrain rebuild`). Falls back to legacy DB-only expire for pre-v51 / thin-client rows. Idempotent on already-expired or unknown ids.",
+    "parameters": {
+      "id": "number",
+      "reason": "string?"
+    }
+  },
+  {
+    "name": "find_contradictions",
+    "description": "v0.32.6 — return suspected-contradiction findings from the most recent `gbrain eval suspected-contradictions` probe run, optionally filtered by slug and/or severity. Use this when the user asks 'what's inconsistent in my brain', 'show me contradictions about Acme', 'high-severity issues only', or wants to act on the probe's findings without re-running it. Returns {contradictions: [{a, b, severity, axis, confidence, resolution_command}]}. Reads the cached run row — does NOT trigger a new probe; users run `gbrain eval suspected-contradictions` for that.",
+    "parameters": {
+      "slug": "string?",
+      "severity": "string?",
+      "limit": "number?"
+    }
+  },
+  {
+    "name": "find_experts",
+    "description": "Answers 'who in my brain knows about <topic>'. Returns ranked person/company pages by expertise depth (sub-linear match score), relationship recency (exp decay with 6-month half-life), and salience. Use this for questions like 'who should I talk to about X', 'who knows about Y', 'find me someone who's worked on Z', or any expertise-routing intent. Filters at SQL to person + company pages — does NOT return notes or articles. Pair with --explain (CLI) to surface the per-result factor breakdown.",
+    "parameters": {
+      "topic": "string?",
+      "limit": "number?",
+      "explain": "boolean?"
+    }
+  }
+]

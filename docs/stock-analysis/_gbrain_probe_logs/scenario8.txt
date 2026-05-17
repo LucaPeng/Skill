@@ -1,0 +1,15 @@
+=== SCENARIO 8: Error paths / boundary cases ===
+Test 1: Query non-existent "asdfqwer1234不存在的板块"
+Result: Returns nearest results (not empty array) — graceful degradation to semantic search
+
+Test 2: Ingest with type: NotARealType
+Result: status "created_or_updated" — silently accepted, no validation error
+
+Test 3: Ingest with confidence: "高" (string instead of expected enum)
+Result: status "created_or_updated" — silently accepted, no type validation
+
+OBSERVATIONS:
+- Q8.A: No structured error codes for invalid frontmatter; silent acceptance
+- Q8.B: No retry mechanism visible at CLI level
+
+VERDICT: PASS (graceful) - query with no match returns nearest results not error; invalid types silently accepted

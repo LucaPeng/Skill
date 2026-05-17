@@ -1,0 +1,25 @@
+=== SCENARIO 1: MCP Tools List ===
+Command: gbrain --tools-json
+Result: 63 tools discovered
+
+Key tools:
+- get_page, put_page, delete_page, restore_page, purge_deleted_pages (CRUD)
+- search, query (search)
+- list_pages (list/filter)
+- add_tag, remove_tag, get_tags (tags)
+- add_link, remove_link, get_backlinks, graph (links)
+- add_timeline_entry, get_timeline (timeline)
+- extract_facts, recall, forget_fact (facts)
+- takes_list, takes_search, takes_scorecard, takes_calibration (takes)
+- submit_job, get_job, list_jobs, pause_job, resume_job, cancel_job, retry_job (jobs)
+- sources_add, sources_list, sources_remove, sources_status (sources)
+- find_orphans, find_anomalies, find_experts, find_contradictions (analysis)
+- get_recent_salience, get_recent_transcripts (salience)
+- think (reasoning)
+- get_brain_identity, get_ingest_log, get_chunks, log_ingest (introspection)
+- file_list, file_upload, file_url (files)
+- get_stats, get_health, run_doctor (health)
+- put_raw_data, get_raw_data, resolve_slugs (data)
+- sync_brain (sync)
+
+VERDICT: PASS - 63 tools >= 5 threshold, read/write distinction via operation descriptions
