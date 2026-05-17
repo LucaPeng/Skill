@@ -1,0 +1,31 @@
+=== SCENARIO V11-2: tag 精确隔离 baseline/user_custom（验 H3）===
+TEST_RUN_ID: gbrain-probe-v11-20260517-0509
+
+STEP V11-2.1: put 两个 strategy pages
+- strategies/chan_theory: status=created_or_updated
+- strategies/my_rotation_rule: status=created_or_updated
+
+STEP V11-2.2: add_tag
+- add_tag(chan_theory, "source:baseline") → {"status": "ok"}
+- add_tag(chan_theory, "priority:reference") → {"status": "ok"}
+- add_tag(my_rotation_rule, "source:user_custom") → {"status": "ok"}
+- add_tag(my_rotation_rule, "priority:primary") → {"status": "ok"}
+
+STEP V11-2.3: list_pages(tag=...) 精确召回
+- list --tag "source:baseline" → 只返回 chan_theory ✓
+- list --tag "source:user_custom" → 只返回 my_rotation_rule ✓
+- list --tag "priority:primary" → 只返回 my_rotation_rule ✓
+- list --tag "priority:reference" → 只返回 chan_theory ✓
+
+STEP V11-2.4: type + tag 联合过滤
+- list --type stock → "No pages found" (type 过滤仍然坏)
+- list --type strategy → "No pages found" (type 过滤仍然坏)
+- list --type strategy --tag "source:baseline" → "No pages found" (组合也不行)
+
+Q&A:
+- Q11-2.A: list_pages(tag=...) 精确匹配 ✓
+- Q11-2.B: 内置 type 不能被 type= 命中（和 v1.0 的 Report bug 一样）
+- Q11-2.C: 单次 list 不支持多 tag 过滤（需客户端取交集）
+- Q11-2.D: tag 名称带 : 完全合法，add_tag/list 正常工作
+
+VERDICT: ✅ H3 PASS（tag 隔离完全 work；type 过滤有 bug 不影响 tag 路线）

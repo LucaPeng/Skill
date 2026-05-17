@@ -970,49 +970,58 @@ gbrain --help          # 看有没有 auto-link enable / disable 子命令
 
 | ID | 假设 | 结果 | 关键证据 |
 |---|---|---|---|
-| H1 | `add_link` 显式建图 | ⬜ | |
-| H2 | `traverse_graph(link_type)` 按边类型遍历 | ⬜ | |
-| H3 | `add_tag` + `list_pages(tag)` 精确隔离 | ⬜ | |
-| H4 | `takes` 装四件套并支持结构化检索 | ⬜ | |
-| H5 | `find_contradictions` 召回 counter_signals | ⬜ | |
-| 加分 | auto_link / wiki link 自动建图 | ⬜ | |
+| H1 | `add_link` 显式建图 | ✅ PASS | add_link→ok，get_links 可查到两条边 |
+| H2 | `traverse_graph(link_type)` 按边类型遍历 | ✅ PASS | link_type="belongs_to_sector" 精确过滤，wrong_type 返回 [] |
+| H3 | `add_tag` + `list_pages(tag)` 精确隔离 | ✅ PASS | source:baseline 只召 chan_theory，source:user_custom 只召 my_rotation_rule |
+| H4 | `takes` 装四件套并支持结构化检索 | ❌ FAIL | 无写入 API（take_add/takes_add/submit_take/create_take/add_take 全部 Unknown tool），takes_list 返回空 |
+| H5 | `find_contradictions` 召回 counter_signals | ⚠️ UNKNOWN | 工具存在，但 takes 写入接口不存在导致无法造数据验证；eval 返回 0 contradictions |
+| 加分 | auto_link / wiki link 自动建图 | ❌ FAIL | [[slug]] 语法 auto_links:0，get_links 返回 []，必须显式 add_link |
 
 #### 关键 Q&A 表
 
 | Q | 答案 |
 |---|---|
-| Q11-1.A `add_link` 真的入库？返回值？ | |
-| Q11-1.B `link_type` 是否预注册？ | |
-| Q11-1.C `get_links` 返回结构？ | |
-| Q11-1.D `traverse_graph(link_type)` 是精确还是模糊？ | |
-| Q11-1.E auto_link 在 put_page 时是否需要开关？ | |
-| Q11-2.A `list_pages(tag=)` 精确？ | |
-| Q11-2.B 内置 type 能命中吗？ | |
-| Q11-2.C 多 tag 联合过滤？ | |
-| Q11-2.D tag 名带 `:` 是否合法？ | |
-| Q11-3.A takes 写入接口是？ | |
-| Q11-3.B `kind` 是否任意字符串？ | |
-| Q11-3.C `weight` 是 [0,1] 吗？confidence 怎么映射？ | |
-| Q11-3.D takes 与 page 的生命周期关系？ | |
-| Q11-3.E 嵌套字段能存 take 里吗？ | |
-| Q11-3.F 跨 report 漂移分析能直接出？ | |
-| Q11-4.A `find_contradictions` 召回我们造的对立 take？ | |
-| Q11-4.B 返回结构含 severity/axis/confidence？ | |
-| Q11-4.C 跨 page 自动比对？ | |
-| Q11-5.A wiki link 被识别为边？ | |
-| Q11-5.B 识别出的边有 link_type 吗？ | |
-| Q11-5.C 能否在 inline 指定 link_type？ | |
+| Q11-1.A `add_link` 真的入库？返回值？ | ✅ 是，返回 `{"status": "ok"}`，get_links 可查到 |
+| Q11-1.B `link_type` 是否预注册？ | 不需要，任意字符串接受（如 `belongs_to_sector`） |
+| Q11-1.C `get_links` 返回结构？ | `{from_slug, to_slug, link_type, context, link_source, origin_slug, origin_field}` |
+| Q11-1.D `traverse_graph(link_type)` 是精确还是模糊？ | 精确匹配，`wrong_type` 返回 `[]` |
+| Q11-1.E auto_link 在 put_page 时是否需要开关？ | 是，auto_links:0（见 V11-5）；auto_link 抽取器默认关闭 |
+| Q11-2.A `list_pages(tag=)` 精确？ | ✅ 精确，`source:baseline` 只召 chan_theory |
+| Q11-2.B 内置 type 能命中吗？ | ❌ 不能，`list --type stock` → "No pages found"（type 过滤有 bug） |
+| Q11-2.C 多 tag 联合过滤？ | 不支持，需客户端取交集 |
+| Q11-2.D tag 名带 `:` 是否合法？ | ✅ 完全合法，`source:baseline` / `priority:primary` 均正常 |
+| Q11-3.A takes 写入接口是？ | ❌ 不存在，尝试过：take_add/takes_add/submit_take/create_take/add_take → 全部 Unknown tool |
+| Q11-3.B `kind` 是否任意字符串？ | 无法验证（无写入路径） |
+| Q11-3.C `weight` 是 [0,1] 吗？confidence 怎么映射？ | 无法验证（无写入路径） |
+| Q11-3.D takes 与 page 的生命周期关系？ | 无法验证（无写入路径） |
+| Q11-3.E 嵌套字段能存 take 里吗？ | 无法验证（无写入路径） |
+| Q11-3.F 跨 report 漂移分析能直接出？ | 无法验证（无 takes 数据） |
+| Q11-4.A `find_contradictions` 召回我们造的对立 take？ | ⚠️ UNKNOWN，takes 无写入路径，无法造数据 |
+| Q11-4.B 返回结构含 severity/axis/confidence？ | API 存在但返回空（无数据） |
+| Q11-4.C 跨 page 自动比对？ | eval 有跨 page 比对，但需 takes 数据做素材 |
+| Q11-5.A wiki link 被识别为边？ | ❌ 不识别，auto_links:0，get_links 返回 [] |
+| Q11-5.B 识别出的边有 link_type 吗？ | N/A（auto_link 不工作） |
+| Q11-5.C 能否在 inline 指定 link_type？ | ❌ 不能，inline 指定 link_type 的语法不存在 |
 
 #### v1.1 总结判断（按 PROPOSAL §5 四件套）
 
 > Hermes 跑完后填：
 
-- 🎯 结论：______（GBrain 是否能纯原生支撑判断层结构化检索？）
-- 📊 核心指标：H1-H5 通过数 _ / 5；加分项 _
+- 🎯 结论：**GBrain 部分支撑 P1-2 结构化 Schema 设计**（中置信度）
+  - link（图谱边）和 tag（命名空间隔离）走 GBrain 原生抽象 ✅
+  - takes（判断层四件套）和 counter_signals（图谱矛盾）**无写入路径**，无法原生支撑 ❌
+- 📊 核心指标：通过试法数 **3/5**（H1+H2+H3=PASS）；失败 **1**（H4=FAIL）；未知 **1**（H5=UNKNOWN）；加分项 FAIL
 - 🧠 判断逻辑：
-  - ...
+  - `add_link` + `traverse_graph` 组成完整 typed graph API，支持任意 link_type，不需要预注册
+  - `add_tag` + `list --tag` 实现精确标签过滤，`source:` 命名空间可替代 frontmatter `source` 字段
+  - frontmatter `type` 字段过滤仍有 bug（v1.0 遗留），但可用 tag 代替 type 做分类隔离
+  - `takes` 系统有 `takes_list` / `takes_calibration` 读接口，但**完全没有写入 API**（无 add_take / take_add / submit_take 等）
+  - `find_contradictions` 依赖 takes 数据做矛盾检测，无 takes 则无矛盾可查
+  - `auto_link` 默认关闭，wiki link `[[slug]]` 不触发自动建图，必须显式 `add_link`
 - ⚠️ 反向信号 / 风险：
-  - ...
+  - **takes 无写入路径** → 判断层四件套（confidence / verdict / reason / indicators）无法存入 GBrain
+  - **counter_signals 无法落地** → `find_contradictions` 依赖 takes 数据，没有 takes 写入接口则此能力是空中楼阁
+  - **必须走双轨**：GBrain 作为 RAG 向量召回层（存正文 + 建图谱边），判断层字段（confidence/verdict/counter_signals）必须存本地结构化存储（SQLite/JSONL）
 
 ---
 

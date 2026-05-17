@@ -1,0 +1,37 @@
+=== SCENARIO V11-3: takes 系统装四件套（验 H4）===
+TEST_RUN_ID: gbrain-probe-v11-20260517-0509
+
+STEP V11-3.1: put report page
+- reports/300750-2026-05-17: status=created_or_updated
+
+STEP V11-3.2: 探查 takes 写入接口
+尝试的 API（全部失败）:
+- take_add       → Unknown tool
+- takes_add      → Unknown tool
+- submit_take    → Unknown tool
+- create_take     → Unknown tool
+- add_take       → Unknown tool
+- jobs submit take → 任务入队（status:waiting）但无 worker 处理
+
+STEP V11-3.3: 试正文 Takes fence 语法
+- put page 时在 body 加 ## Takes / - kind: sector_environment ... 
+  → auto_links:0, facts_backstop: {skipped: kind:concept}
+  → takes_list(kind: "sector_environment") → []
+
+STEP V11-3.4: takes_list/read APIs 验证
+- takes_list({}) → []（空，系统里没有 takes）
+- takes_calibration(holder: ...) → []（无数据）
+
+STEP V11-3.5: find_contradictions
+→ {"contradictions": [], "note": "No probe runs in the last 30 days..."}
+→ 需要先跑 `gbrain eval suspected-contradictions` 才能建立矛盾索引
+
+Q&A:
+- Q11-3.A: takes 写入接口 → **不存在**。无 add_take/take_add 等 MCP 工具
+- Q11-3.B: kind 字段 → 只能猜，不能写入验证
+- Q11-3.C: weight 字段 → 只能猜，不能写入验证
+- Q11-3.D: takes 与 page 生命周期 → 无法写入，无验证机会
+- Q11-3.E: 嵌套字段 → 无法写入，无验证机会
+- Q11-3.F: 跨 report 漂移分析 → 无 takes 数据，无验证机会
+
+VERDICT: ❌ H4 FAIL（takes 系统无写入路径，所有 takes_list API 返回空）

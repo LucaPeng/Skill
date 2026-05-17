@@ -1,0 +1,26 @@
+=== SCENARIO V11-4: find_contradictions 召 counter_signals（验 H5）===
+TEST_RUN_ID: gbrain-probe-v11-20260517-0509
+
+STEP V11-4.1: 制造对立 takes（无写入路径，依赖 V11-3）
+- takes 系统无写入 API（见 V11-3 结论）
+- 在 report page body 写 ## Takes fence → 被当作普通文本，不被 takes API 识别
+- 无法制造"对立 takes"来验证召回
+
+STEP V11-4.2: 跑 gbrain eval suspected-contradictions
+- eval suspected-contradictions --query "宁德时代"
+- 结果：0 contradictions flagged，total_in_run: 0
+- Judge errors: 10 other（judge 无法解析输出）
+- 矛盾检测依赖 LLM judge 分析，系统里没有 takes 作为对比素材
+
+STEP V11-4.3: find_contradictions MCP 调用
+- find_contradictions(slug=...) → {contradictions: [], total_in_run: 0}
+- find_contradictions(severity=high) → {contradictions: [], total_in_run: 0}
+
+Q&A:
+- Q11-4.A: find_contradictions 能召我们对立 take？→ **无法验证**（无 takes 写入路径）
+- Q11-4.B: 返回结构含 severity/axis/confidence？→ API 存在，但返回空（无数据）
+- Q11-4.C: 跨 page 自动比对？→ eval 有跨 page 比对逻辑，但前提是有 takes 数据
+
+VERDICT: ⚠️ H5 UNKNOWN（工具存在但无法验证，因为 takes 写入接口不存在）
+- takes 系统是 find_contradictions 的前提；无 takes 则无矛盾可查
+- 工具本身存在但依赖异步 eval + takes 数据，当前探针无法造数据验证

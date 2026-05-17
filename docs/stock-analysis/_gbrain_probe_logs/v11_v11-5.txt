@@ -1,0 +1,24 @@
+=== SCENARIO V11-5: auto_link/wiki link 自动建图 ===
+TEST_RUN_ID: gbrain-probe-v11-20260517-0509
+
+STEP V11-5.1: put page with [[slug]] wiki link
+- reports/300750-2026-05-19: status=created_or_updated
+- body 含: 今日 [[_probe/gbrain-probe-v11-20260517-0509/stocks/300750]] 跟随 [[.../sectors/new_energy]] 板块上涨 2.3%
+- auto_links: {"created": 0, "removed": 0, "errors": 0, "unresolved": []}
+
+STEP V11-5.2: get_links 立即查
+→ [] (空数组，无自动建边)
+
+STEP V11-5.3: find_orphans 验证
+→ 22 orphans 中包括新 put 的 reports/300750-2026-05-19（无 inbound link）
+
+STEP V11-5.4: doctor 探查
+→ doctor 输出含 graph_coverage / facts_extraction_health 检查项
+→ 但无明确 auto_link enable/disable 状态输出
+
+Q&A:
+- Q11-5.A: [[slug]] wiki link 不被识别为边 → get_links 返回 []
+- Q11-5.B: 识别出的边无 link_type（因为 auto_link 根本没触发）
+- Q11-5.C: 无法在 inline 指定 link_type（auto_link 不工作）
+
+VERDICT: ❌ 加分项 FAIL（auto_link / wiki link 不自动建图，必须用 add_link 显式建边）
