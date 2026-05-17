@@ -1,10 +1,36 @@
-# GBrain 探索测试方案 v1.0
+# GBrain 探索测试方案 v1.1
 
 > 用途：交付给 [Hermes Agent](https://github.com/garrytan/gbrain) 在**开发机**上执行，实测 GBrain 的 MCP 工具能力边界
 > 对应 [PLAN.md](./PLAN.md) §第 2 步
 > 输出去向：所有结果回填到本文件 §6 的"实测结果"小节，并以本文件为基础生成 `RESEARCH_gbrain.md`
 > 测试样本：本仓库 [`skills/stock-analysis/_assets/strategies/`](../../skills/stock-analysis/_assets/strategies/) 中的 ZhuLinsen 11 套策略 YAML
 > Review 关联：[REVIEW.md](./REVIEW.md) P1-2（字段级查询） / RS-2（baseline 隔离）
+
+---
+
+## 🔥 v1.1 重要更新（2026-05-17）
+
+**只跑 §10。§4 的 SCENARIO 1-8 和 §6 的旧结果保留作为历史证据，不要再跑。**
+
+### 为什么有 v1.1
+v1.0 的实测结论是 V3/V6/V7 三项 FAIL → 倒向"分支 B 双轨"。但复审 GBrain 官方 README 与 63 个 MCP 工具 schema 后发现 **三处失败均存在用法误判**：
+
+| 失败项 | v1.0 定性 | 真相 |
+|---|---|---|
+| V3 typed link | "GBrain 不识别正文 markdown link" | ✅ 用法错。typed link 是显式 API：`add_link` / `traverse_graph` / `get_links`，不是从正文 parse |
+| V6 字段过滤 | "frontmatter 字段无法 WHERE" | 🟡 部分属实 + 用法错。自定义 `type: Stock` 不进 type 索引（确实不行），但 GBrain 有 `takes_list` 提供"holder/kind/active/resolved"等结构化过滤；`tag` 也支持精确过滤 |
+| V7 baseline 隔离 | "无法按 source 字段筛选" | ❌ 设计错。改用 `add_tag("source:baseline")` + `list_pages(tag=...)` 即可精确隔离 |
+
+### v1.0 中"被冤枉的"GBrain 能力（必须重测）
+
+GBrain README 明确声明 + MCP schema 验证：
+1. **自带 self-wiring 知识图谱**（zero-LLM auto_link）—— `add_link / traverse_graph / get_links / get_backlinks` 是显式 API
+2. **`tag` 支持精确过滤** —— `list_pages(tag="...")` 走索引
+3. **`takes` 系统**是为"带权重、带置信度、带归属的结构化主张"设计的 —— 跟我们的"判断层四件套（verdict/confidence/indicators/counter_signals）" 抽象高度对齐
+4. **`find_contradictions`** 直接对应 counter_signals 检索
+5. **`takes_calibration` / `takes_scorecard`** 直接对应 confidence 漂移分析
+
+→ 如果这些都 work，**Schema 不需要双轨，可以全部走 GBrain 原生抽象。**
 
 ---
 
@@ -535,3 +561,506 @@ BRAIN_DIR=/data00/home/songpeng.nk/brain ~/npm-global/lib/node_modules/bun/bin/b
 | 日期 | 发现 | 决策 |
 |---|---|---|
 | _Hermes 填_ | _..._ | _..._ |
+
+---
+
+## 10. v1.1 补测：验证 GBrain 原生抽象（重点跑这一节）
+
+> 触发原因：v1.0 的 V3/V6/V7 实测失败，但复审发现三处都用错了 GBrain 的原语。本节用**正确用法**重新验证，决定 Schema 设计是否要走"双轨"。
+
+### 10.0 测试常量
+
+| 名称 | 值 |
+|---|---|
+| `TEST_RUN_ID` | `gbrain-probe-v11-<YYYYMMDD-HHMM>`（执行时取当时时间） |
+| `PROBE_NAMESPACE` | `_probe/<TEST_RUN_ID>/`（所有写入页面统一前缀） |
+
+> ⚠️ **本节是补测，不要再写 v1.0 §4 那批 page。** 用全新前缀避免混淆。
+
+### 10.1 五个待验证假设
+
+| ID | 假设 | 失败时影响 |
+|---|---|---|
+| **H1** | `add_link(from, to, link_type)` 能显式建图，且 link 真的入库 | 关系图谱方案 1 |
+| **H2** | `traverse_graph(slug, link_type, direction)` 能按边类型遍历 | 关系图谱方案 2 |
+| **H3** | `add_tag` + `list_pages(tag=...)` 能精确隔离 baseline / user_custom | RS-2 落地能否走 tag 路线 |
+| **H4** | `takes` 系统能存"判断层四件套"并支持结构化检索 | P1-2 字段化方案 |
+| **H5** | `find_contradictions` 能召回 counter_signals 类对立证据 | counter_signals 落地形式 |
+
+---
+
+### 🔗 SCENARIO V11-1：显式 typed link 建图（验 H1 H2）
+
+**目的**：用 `add_link` 显式建图，验证 v1.0 SCENARIO 3 失败是不是用法错。
+
+**STEP V11-1.1**：先 put 三个 page（不要在正文里写 markdown link，正文留空或只写一句话）
+
+```bash
+# Stock page
+gbrain put-page "${PROBE_NAMESPACE}stocks/300750" --content "$(cat <<EOF
+---
+type: stock
+code: "300750"
+name: 宁德时代
+test_run_id: ${TEST_RUN_ID}
+---
+# 宁德时代 (300750)
+EOF
+)"
+
+# Sector page
+gbrain put-page "${PROBE_NAMESPACE}sectors/new_energy" --content "$(cat <<EOF
+---
+type: sector
+name: 新能源
+test_run_id: ${TEST_RUN_ID}
+---
+# 新能源板块
+EOF
+)"
+
+# Industry page
+gbrain put-page "${PROBE_NAMESPACE}industries/dongli_battery" --content "$(cat <<EOF
+---
+type: industry
+name: 动力电池
+test_run_id: ${TEST_RUN_ID}
+---
+# 动力电池行业
+EOF
+)"
+```
+
+> 注意 `type` 字段值用**小写**（`stock` / `sector` / `industry`），跟 GBrain README 里 `person` / `company` / `concept` 风格保持一致。如果 GBrain 真的接受这个字段，应能用 `list_pages(type="stock")` 命中。
+
+**STEP V11-1.2**：用 MCP `add_link` 显式建边
+
+```
+add_link(
+  from: "${PROBE_NAMESPACE}stocks/300750",
+  to:   "${PROBE_NAMESPACE}sectors/new_energy",
+  link_type: "belongs_to_sector",
+  context: "宁德时代属于新能源板块"
+)
+
+add_link(
+  from: "${PROBE_NAMESPACE}stocks/300750",
+  to:   "${PROBE_NAMESPACE}industries/dongli_battery",
+  link_type: "belongs_to_industry"
+)
+```
+
+**STEP V11-1.3**：用 `get_links` 查正向边
+
+```
+get_links(slug: "${PROBE_NAMESPACE}stocks/300750")
+```
+
+**期望**：返回包含两条边的数组，分别是 `belongs_to_sector → sectors/new_energy` 和 `belongs_to_industry → industries/dongli_battery`。
+
+**STEP V11-1.4**：用 `get_backlinks` 查反向边
+
+```
+get_backlinks(slug: "${PROBE_NAMESPACE}sectors/new_energy")
+```
+
+**期望**：返回包含 `stocks/300750 -- belongs_to_sector --> sectors/new_energy` 的反向引用。
+
+**STEP V11-1.5**：用 `traverse_graph` 按 link_type 过滤遍历
+
+```
+traverse_graph(
+  slug: "${PROBE_NAMESPACE}stocks/300750",
+  depth: 1,
+  link_type: "belongs_to_sector",
+  direction: "out"
+)
+```
+
+**期望**：只返回 sector 那条边，不返回 industry 那条。
+
+**关键问题（必须回答）**：
+- Q11-1.A：`add_link` 是否真的写入图谱？返回值是什么？
+- Q11-1.B：`link_type` 是否要预注册？任意字符串都接受吗？
+- Q11-1.C：`get_links` 返回结构是？有 `link_type` 字段吗？
+- Q11-1.D：`traverse_graph` 的 `link_type` 过滤是精确匹配还是模糊？
+- Q11-1.E：v0.4+ 的 "auto_link 抽取器"在 `put_page` 时是否需要额外开关启用？是否可以靠它自动建立 typed link，免去手动 `add_link`？
+
+**通过标准（H1 + H2）**：
+- ✅ `add_link` 写入成功且 `get_links` 能查到
+- ✅ `traverse_graph(link_type=...)` 能精确过滤
+
+---
+
+### 🏷️ SCENARIO V11-2：tag 精确隔离 baseline / user_custom（验 H3）
+
+**目的**：验证用 tag 替代 frontmatter `source` 字段，能否实现 RS-2 baseline 隔离。
+
+**STEP V11-2.1**：put 两个 strategy page，同领域、不同来源
+
+```bash
+gbrain put-page "${PROBE_NAMESPACE}strategies/chan_theory" --content "$(cat <<EOF
+---
+type: strategy
+name: chan_theory
+display_name: 缠论
+upstream_commit: a75a0c502e06a49f08439275aaeb7be241c5befe
+test_run_id: ${TEST_RUN_ID}
+---
+# 缠论一买点
+（正文从 chan_theory.yaml 的 instructions 字段拷过来）
+EOF
+)"
+
+gbrain put-page "${PROBE_NAMESPACE}strategies/my_rotation_rule" --content "$(cat <<EOF
+---
+type: strategy
+name: my_rotation_rule
+display_name: 我的轮动规则
+test_run_id: ${TEST_RUN_ID}
+---
+# 我的轮动规则
+板块连续 3 日资金净流入 + 涨幅前 5 ...
+EOF
+)"
+```
+
+**STEP V11-2.2**：打 tag
+
+```
+add_tag(slug: "${PROBE_NAMESPACE}strategies/chan_theory",     tag: "source:baseline")
+add_tag(slug: "${PROBE_NAMESPACE}strategies/chan_theory",     tag: "priority:reference")
+add_tag(slug: "${PROBE_NAMESPACE}strategies/my_rotation_rule", tag: "source:user_custom")
+add_tag(slug: "${PROBE_NAMESPACE}strategies/my_rotation_rule", tag: "priority:primary")
+```
+
+**STEP V11-2.3**：用 `list_pages(tag=...)` 精确召回
+
+```
+# 测 1：只要 baseline 的策略
+list_pages(tag: "source:baseline")
+
+# 测 2：只要 primary 的策略
+list_pages(tag: "priority:primary")
+
+# 测 3：组合（如支持）—— GBrain 单次 list_pages 不接受多 tag，需要客户端取交集
+list_pages(tag: "source:user_custom")
+```
+
+**STEP V11-2.4**：测试 tag + type 联合过滤是否走索引（性能基线）
+
+```
+list_pages(type: "strategy", tag: "source:baseline", limit: 50)
+```
+
+**关键问题**：
+- Q11-2.A：`list_pages(tag=...)` 返回是否精确匹配？（不是模糊）
+- Q11-2.B：内置 type（stock/strategy）能否被 `type=` 参数命中？还是和 v1.0 的 Report 一样返回 0？
+- Q11-2.C：是否支持多 tag 同时过滤（AND 语义）？还是只能客户端做交集？
+- Q11-2.D：tag 命名带 `:` 冒号是否合法？（GBrain skills 里有 `source:baseline` 这种用法的先例吗）
+
+**通过标准（H3）**：
+- ✅ `list_pages(tag="source:baseline")` 只返回 chan_theory 不返回 my_rotation_rule
+- ✅ `list_pages(tag="source:user_custom")` 反之
+
+---
+
+### 📊 SCENARIO V11-3：takes 系统装"判断层四件套"（验 H4）
+
+**目的**：v1.0 的 §6 用 frontmatter `modules.sector_environment.confidence` 失败了。本节验证用 takes 系统装这套判断字段是否可行。
+
+**STEP V11-3.1**：先建一个 report page 作为 takes 的"宿主"
+
+```bash
+gbrain put-page "${PROBE_NAMESPACE}reports/300750-2026-05-17" --content "$(cat <<EOF
+---
+type: report
+code: "300750"
+report_date: "2026-05-17"
+test_run_id: ${TEST_RUN_ID}
+---
+# 宁德时代 2026-05-17 板块环境分析
+正文略
+EOF
+)"
+```
+
+**STEP V11-3.2**：探查 `takes` 写入接口
+
+> takes 系统的写入入口在 GBrain 内部应有 `take_add` / `take_create` / 或通过 `submit_job(name="take")` / 或在 page 正文用特殊语法（`## Takes` fence？）。Hermes 自己探测。
+
+参考 `takes_list` 的过滤字段：`holder / kind / active / resolved` —— 这些就是写入时要传的关键字段。
+
+**尝试写一条 take 表达"板块环境 verdict + confidence"**：
+
+```
+# 试法 A：直接调 take_add（如存在）
+take_add(
+  page_slug: "${PROBE_NAMESPACE}reports/300750-2026-05-17",
+  holder: "stock-analysis-skill",
+  kind: "sector_environment",
+  claim: "板块处于轮动中段",
+  weight: 0.6,                # confidence: medium → 0.6
+  active: true
+)
+
+# 试法 B：在 page 正文用 ## Facts 或 ## Takes fence（GBrain v0.31+ 似乎用这种语法）
+（在 put_page 时，body 加一段：
+## Takes
+- kind: sector_environment | claim: 板块处于轮动中段 | weight: 0.6 | holder: stock-analysis-skill
+）
+```
+
+**STEP V11-3.3**：再写两条不同 confidence 的 take 做对比池
+
+```
+# Report B：confidence low
+take_add(holder=..., kind="sector_environment", claim="板块退潮", weight=0.3, ...)
+
+# Report C（不同股）：confidence high
+take_add(holder=..., kind="sector_environment", claim="板块加速期", weight=0.85, ...)
+```
+
+**STEP V11-3.4**：用 `takes_list` 做结构化过滤 —— **这是 P1-2 命门**
+
+```
+# 只要 kind=sector_environment 的所有 takes
+takes_list(kind: "sector_environment")
+
+# 只要某 holder 的 takes
+takes_list(holder: "stock-analysis-skill", kind: "sector_environment")
+
+# 只要 active 的（resolved=false）
+takes_list(kind: "sector_environment", active: true, resolved: false)
+```
+
+**STEP V11-3.5**：用 `takes_search` 做关键词搜
+
+```
+takes_search(query: "板块轮动")
+```
+
+**STEP V11-3.6**（可选，看能力天花板）：调 `takes_calibration`，看 confidence 漂移分析能不能直接出图
+
+```
+takes_calibration(holder: "stock-analysis-skill", bucket_size: 0.1)
+```
+
+**关键问题（必须回答 — 决定 Schema 设计）**：
+- Q11-3.A：takes 的写入接口是什么？MCP 里没有 `take_add`，是不是要用 `extract_facts` / `submit_job` / 还是正文 fence？
+- Q11-3.B：`kind` 字段是任意字符串还是预定义枚举？我们能写 `sector_environment` / `industry_prosperity` / `tech_signal` 这种吗？
+- Q11-3.C：`weight` 是 [0,1] 浮点吗？我们的 `confidence: low/medium/high` 怎么映射？
+- Q11-3.D：takes 是否绑定 page？删 page 时 take 怎么处理？
+- Q11-3.E：嵌套字段（如 `indicators` 数组、`reasoning_chain` 列表）能否随 take 一起存？还是只能存 claim 文本？
+- Q11-3.F：跨 report 比对"同一只股的 sector_environment.confidence 漂移"能不能用 takes 直接出？
+
+**通过标准（H4）**：
+- ✅ 至少一种试法能成功写入 take 并被 `takes_list(kind=...)` 检索
+- ✅ `kind` 接受自定义字符串
+- 🟡 `weight` 能容纳我们的 confidence 等级（即使要做映射）
+
+**FAIL 影响**：如果 takes 系统不接受我们要的字段，则 confidence/verdict 必须放回 frontmatter 配 tag，并接受查询时只能拉全量再客户端过滤。
+
+---
+
+### ⚖️ SCENARIO V11-4：find_contradictions 召回 counter_signals（验 H5）
+
+**目的**：验 GBrain 自带的"找矛盾"能力是否可以承担 counter_signals 检索。
+
+**STEP V11-4.1**：制造两条立场对立的 takes（写到同一只股的两份不同日期 report）
+
+```
+# Report 2026-05-17：看多
+take_add(
+  page_slug: ".../reports/300750-2026-05-17",
+  holder: "stock-analysis-skill",
+  kind: "stance",
+  claim: "宁德时代当前处于建仓窗口期，板块共振 + 龙头量能放大",
+  weight: 0.7
+)
+
+# Report 2026-05-18：看空（针对同一只股，立场相反）
+take_add(
+  page_slug: ".../reports/300750-2026-05-18",
+  holder: "stock-analysis-skill",
+  kind: "stance",
+  claim: "宁德时代板块退潮，资金高位获利了结，建议回避",
+  weight: 0.65
+)
+```
+
+**STEP V11-4.2**：先按 GBrain 文档跑 `gbrain eval suspected-contradictions`（CLI），生成探针缓存
+
+```bash
+gbrain eval suspected-contradictions
+```
+
+**STEP V11-4.3**：调 `find_contradictions` MCP
+
+```
+find_contradictions(slug: ".../reports/300750-2026-05-17")
+find_contradictions(slug: ".../reports/300750-2026-05-18")
+find_contradictions(severity: "high")  # 不限 slug
+```
+
+**关键问题**：
+- Q11-4.A：`find_contradictions` 能找到上面的对立 take 吗？
+- Q11-4.B：返回结构里有 `severity / axis / confidence` 吗？我们能用 `axis` 区分"立场矛盾 vs 指标矛盾"吗？
+- Q11-4.C：跨 page 跨日期的同 holder takes 是否会被自动比对？
+
+**通过标准（H5）**：
+- ✅ 能召回上面这对 takes 作为 contradiction
+- 🟡 即使召回率不高，至少返回结构里能挂上"对立证据"作为 counter_signals 的种子
+
+**FAIL 影响**：counter_signals 必须自己存到 frontmatter 数组里，每次比对靠客户端逻辑。
+
+---
+
+### 🧹 SCENARIO V11-5：auto_link 自动建图（探索 H1 加分项）
+
+**目的**：v1.0 的失败假设是"auto_link 自动从正文建图"，看 GBrain 是否真有这个能力，但需要某种 enable / 配置。
+
+**STEP V11-5.1**：在 page 正文用 GBrain 标准的"wiki link"语法 `[[page slug]]`
+
+```bash
+gbrain put-page "${PROBE_NAMESPACE}reports/300750-2026-05-19" --content "$(cat <<EOF
+---
+type: report
+test_run_id: ${TEST_RUN_ID}
+---
+# 宁德时代复盘
+今日 [[${PROBE_NAMESPACE}stocks/300750]] 跟随 [[${PROBE_NAMESPACE}sectors/new_energy]] 板块上涨 2.3%。
+EOF
+)"
+```
+
+**STEP V11-5.2**：put 后立即 `get_links` 看是否被自动建边
+
+```
+get_links(slug: "${PROBE_NAMESPACE}reports/300750-2026-05-19")
+```
+
+**STEP V11-5.3**：尝试 `find_orphans` 看新 page 是不是被识别为"已建立反向链接"
+
+```
+find_orphans()
+```
+
+**STEP V11-5.4**（如有）：探查 GBrain 的 entity registry / auto_link 配置
+
+```bash
+gbrain doctor          # 看健康检查里有没有 auto_link 状态
+gbrain --help          # 看有没有 auto-link enable / disable 子命令
+```
+
+**关键问题**：
+- Q11-5.A：`[[slug]]` wiki link 语法是否被 GBrain 识别为边？
+- Q11-5.B：识别出的边有 `link_type` 吗？还是默认 `mentions` / `wikilink`？
+- Q11-5.C：能否通过 frontmatter 或某种 inline 语法**给自动建出的边指定 link_type**？
+
+**通过标准**：
+- 🟡 如果 wiki link 能自动建边但无 typed 信息 → 仍可用，typed 关系靠 `add_link` 显式补
+- ✅ 如果支持 `[[slug | belongs_to_sector]]` 或类似语法指定类型 → 加分项，写入更省事
+
+---
+
+### 📝 v1.1 实测结果回填表（Hermes 跑完后填）
+
+#### 假设验证矩阵
+
+| ID | 假设 | 结果 | 关键证据 |
+|---|---|---|---|
+| H1 | `add_link` 显式建图 | ⬜ | |
+| H2 | `traverse_graph(link_type)` 按边类型遍历 | ⬜ | |
+| H3 | `add_tag` + `list_pages(tag)` 精确隔离 | ⬜ | |
+| H4 | `takes` 装四件套并支持结构化检索 | ⬜ | |
+| H5 | `find_contradictions` 召回 counter_signals | ⬜ | |
+| 加分 | auto_link / wiki link 自动建图 | ⬜ | |
+
+#### 关键 Q&A 表
+
+| Q | 答案 |
+|---|---|
+| Q11-1.A `add_link` 真的入库？返回值？ | |
+| Q11-1.B `link_type` 是否预注册？ | |
+| Q11-1.C `get_links` 返回结构？ | |
+| Q11-1.D `traverse_graph(link_type)` 是精确还是模糊？ | |
+| Q11-1.E auto_link 在 put_page 时是否需要开关？ | |
+| Q11-2.A `list_pages(tag=)` 精确？ | |
+| Q11-2.B 内置 type 能命中吗？ | |
+| Q11-2.C 多 tag 联合过滤？ | |
+| Q11-2.D tag 名带 `:` 是否合法？ | |
+| Q11-3.A takes 写入接口是？ | |
+| Q11-3.B `kind` 是否任意字符串？ | |
+| Q11-3.C `weight` 是 [0,1] 吗？confidence 怎么映射？ | |
+| Q11-3.D takes 与 page 的生命周期关系？ | |
+| Q11-3.E 嵌套字段能存 take 里吗？ | |
+| Q11-3.F 跨 report 漂移分析能直接出？ | |
+| Q11-4.A `find_contradictions` 召回我们造的对立 take？ | |
+| Q11-4.B 返回结构含 severity/axis/confidence？ | |
+| Q11-4.C 跨 page 自动比对？ | |
+| Q11-5.A wiki link 被识别为边？ | |
+| Q11-5.B 识别出的边有 link_type 吗？ | |
+| Q11-5.C 能否在 inline 指定 link_type？ | |
+
+#### v1.1 总结判断（按 PROPOSAL §5 四件套）
+
+> Hermes 跑完后填：
+
+- 🎯 结论：______（GBrain 是否能纯原生支撑判断层结构化检索？）
+- 📊 核心指标：H1-H5 通过数 _ / 5；加分项 _
+- 🧠 判断逻辑：
+  - ...
+- ⚠️ 反向信号 / 风险：
+  - ...
+
+---
+
+### 10.2 v1.1 一键下发 Prompt（粘给 Hermes）
+
+```
+你现在按 docs/stock-analysis/GBRAIN_PROBE.md §10 v1.1 补测的计划执行：
+
+⚠️ 不要再跑 §4 的 SCENARIO 1-8，§6 旧结果保留作为历史证据。
+⚠️ 只跑 §10.1 的 SCENARIO V11-1 到 V11-5。
+
+执行规则：
+1. TEST_RUN_ID = gbrain-probe-v11-$(date +%Y%m%d-%H%M)
+2. 所有写入 page 都加前缀 _probe/$TEST_RUN_ID/，与 v1.0 的探针 page 隔离
+3. 用 GBrain 原生 MCP 工具（add_link / traverse_graph / add_tag / list_pages /
+   takes_list / takes_search / find_contradictions 等），不要再像 v1.0 那样
+   "在正文写 markdown link 期望自动 parse"
+4. 每个 SCENARIO 完成后立即在 §10.1 末尾的"实测结果回填表"中填一行
+5. 把每个 SCENARIO 的 raw I/O 存到
+   docs/stock-analysis/_gbrain_probe_logs/v11_<scenario_id>.txt
+6. 全部跑完后填写 §10.1 末尾的"v1.1 总结判断"四件套
+7. 最后参考 §7 的清理脚本，把 _probe/$TEST_RUN_ID/ 命名空间清理干净
+
+如果某个 SCENARIO 的关键 STEP 失败（比如 takes 写入接口找不到），
+不要硬猜或试图修 GBrain，记录现象 + 你尝试过的所有 API 名称后跳到下一个。
+
+执行完毕后，commit 到 main：
+"chore(stock-analysis): GBrain probe v1.1 results [Step 2 retest]"
+然后 ping 我等下一步指示。
+```
+
+### 10.3 v1.1 验收标准
+
+- [ ] §10.1 的 H1-H5 假设矩阵全部填完，没有 ⬜
+- [ ] §10.1 的 21 个 Q 全部有答案（"工具不存在"也是答案）
+- [ ] §10.1 末尾"v1.1 总结判断"按四件套填好
+- [ ] `_probe/gbrain-probe-v11-*` 命名空间已清理
+- [ ] commit message: `chore(stock-analysis): GBrain probe v1.1 results [Step 2 retest]`
+
+### 10.4 v1.1 之后的分支决策
+
+执行完毕后，根据 H1-H5 通过数：
+
+| 通过数 | 判定 | 走向 |
+|---|---|---|
+| **5/5（含加分）** | GBrain 完全胜任，原生抽象支持判断层 | → 走 PROPOSAL §3.4 单轨方案，但 Schema 字段重写为 GBrain 原生抽象（page + tag + link + take） |
+| **3-4/5** | GBrain 主体可用，少数环节走客户端逻辑 | → 单轨主、客户端补，PROPOSAL §3.4 加"补丁说明" |
+| **1-2/5** | 仍需双轨 | → 走原 §8 分支 B（GBrain RAG + SQLite 索引） |
+| **0/5** | GBrain 不胜任 | → 走原 §8 分支 C（重审选型） |
+
+> v1.1 跑完后，[PROPOSAL.md](./PROPOSAL.md) 升 v0.4，[PLAN.md](./PLAN.md) 升 v0.3，按上表分支落地。
